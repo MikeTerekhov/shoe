@@ -10,6 +10,7 @@ int main(void) {
   char username[100] = {0};
   int letter_count = 0;
   Rectangle input_box = {260, 220, 280, 40};
+  Rectangle login_button = {260, 275, 120, 40};
 
   bool logged_in = false;
   char greeting[150] = {0};
@@ -31,7 +32,10 @@ int main(void) {
         username[letter_count] = '\0';
       }
 
-      if (IsKeyPressed(KEY_ENTER) && letter_count > 0) {
+      bool login_clicked = IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
+                           CheckCollisionPointRec(GetMousePosition(), login_button);
+
+      if ((IsKeyPressed(KEY_ENTER) || login_clicked) && letter_count > 0) {
         sqlite3 *db = db_open("shoes.db");
         if (!db) {
           snprintf(greeting, sizeof(greeting), "Could not access the database.");
@@ -61,6 +65,11 @@ int main(void) {
       DrawRectangleRec(input_box, LIGHTGRAY);
       DrawRectangleLinesEx(input_box, 2, DARKGRAY);
       DrawText(username, (int)input_box.x + 8, (int)input_box.y + 10, 20, BLACK);
+
+      bool hovered = CheckCollisionPointRec(GetMousePosition(), login_button);
+      DrawRectangleRec(login_button, hovered ? GRAY : LIGHTGRAY);
+      DrawRectangleLinesEx(login_button, 2, DARKGRAY);
+      DrawText("Login", (int)login_button.x + 30, (int)login_button.y + 10, 20, BLACK);
     } else {
       DrawText(greeting, 260, 220, 20, DARKGREEN);
     }

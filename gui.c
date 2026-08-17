@@ -48,6 +48,7 @@ int main(void) {
   Rectangle model_box = {460, 202, 260, 32};
   Rectangle size_box = {460, 264, 100, 32};
   Rectangle add_button = {460, 306, 150, 36};
+  Rectangle logout_button = {690, 16, 90, 30};
 
   while (!WindowShouldClose()) {
     if (!logged_in) {
@@ -82,6 +83,25 @@ int main(void) {
         logged_in = true;
       }
     } else {
+      bool logout_clicked = IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
+                            CheckCollisionPointRec(GetMousePosition(), logout_button);
+
+      if (logout_clicked) {
+        logged_in = false;
+        user_id = -1;
+        username[0] = '\0';
+        letter_count = 0;
+        greeting[0] = '\0';
+        shoe_count = 0;
+        brand_input[0] = '\0';
+        model_input[0] = '\0';
+        size_input[0] = '\0';
+        brand_len = model_len = size_len = 0;
+        active_field = -1;
+        add_status[0] = '\0';
+        continue;
+      }
+
       if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         Vector2 mouse = GetMousePosition();
         if (CheckCollisionPointRec(mouse, brand_box)) active_field = 0;
@@ -145,6 +165,11 @@ int main(void) {
       DrawRectangleLinesEx(login_button, 2, DARKGRAY);
       DrawText("Login", (int)login_button.x + 30, (int)login_button.y + 10, 20, BLACK);
     } else {
+      bool logout_hovered = CheckCollisionPointRec(GetMousePosition(), logout_button);
+      DrawRectangleRec(logout_button, logout_hovered ? GRAY : LIGHTGRAY);
+      DrawRectangleLinesEx(logout_button, 2, DARKGRAY);
+      DrawText("Logout", (int)logout_button.x + 12, (int)logout_button.y + 6, 18, BLACK);
+
       DrawText(greeting, 40, 90, 20, DARKGREEN);
       DrawText("Your shoes:", 40, 130, 18, DARKGRAY);
 

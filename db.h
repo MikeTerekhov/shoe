@@ -22,4 +22,14 @@ int db_add_shoe(sqlite3 *db, int user_id, const char *brand,
 // printed, or -1 on error.
 int db_list_shoes(sqlite3 *db, int user_id);
 
+typedef struct {
+  char brand[50];
+  char model[50];
+  double size;
+} Shoe;
+
+// Fills shoes with up to max_shoes owned by user_id. Returns the number of
+// shoes written, or -1 on error.
+int db_get_shoes(sqlite3 *db, int user_id, Shoe shoes[], int max_shoes);
+
 #endif

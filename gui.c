@@ -15,6 +15,9 @@ int main(void) {
   bool logged_in = false;
   char greeting[150] = {0};
 
+  Shoe shoes[50];
+  int shoe_count = 0;
+
   while (!WindowShouldClose()) {
     if (!logged_in) {
       int key = GetCharPressed();
@@ -42,15 +45,21 @@ int main(void) {
         } else {
           int is_new = 0;
           int user_id = db_get_or_create_user(db, username, &is_new);
-          db_close(db);
 
           if (user_id < 0) {
             snprintf(greeting, sizeof(greeting), "Something went wrong logging you in.");
-          } else if (is_new) {
-            snprintf(greeting, sizeof(greeting), "Welcome, %s! You're all set up.", username);
           } else {
-            snprintf(greeting, sizeof(greeting), "Hello again, %s!", username);
+            if (is_new) {
+              snprintf(greeting, sizeof(greeting), "Welcome, %s! You're all set up.", username);
+            } else {
+              snprintf(greeting, sizeof(greeting), "Hello again, %s!", username);
+            }
+
+            shoe_count = db_get_shoes(db, user_id, shoes, 50);
+            if (shoe_count < 0) shoe_count = 0;
           }
+
+          db_close(db);
         }
         logged_in = true;
       }
@@ -72,6 +81,17 @@ int main(void) {
       DrawText("Login", (int)login_button.x + 30, (int)login_button.y + 10, 20, BLACK);
     } else {
       DrawText(greeting, 260, 220, 20, DARKGREEN);
+
+      if (shoe_count == 0) {
+        DrawText("You don't have any shoes yet.", 260, 260, 18, DARKGRAY);
+      } else {
+        for (int i = 0; i < shoe_count; i++) {
+          char line[100];
+          snprintf(line, sizeof(line), "%d.) %s %s, size %.1f", i + 1,
+                   shoes[i].brand, shoes[i].model, shoes[i].size);
+          DrawText(line, 260, 260 + i * 26, 18, DARKGRAY);
+        }
+      }
     }
 
     EndDrawing();

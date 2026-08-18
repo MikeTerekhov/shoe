@@ -28,6 +28,7 @@ typedef struct {
   char model[50];
   double size;
   double miles;
+  char tag[20];
 } Shoe;
 
 // Fills shoes with up to max_shoes owned by user_id. Returns the number of
@@ -41,5 +42,9 @@ int db_delete_shoe(sqlite3 *db, int user_id, int shoe_id);
 // Adds miles to the running total for shoe_id, provided it's owned by
 // user_id. Returns 0 on success, -1 on error.
 int db_add_miles(sqlite3 *db, int user_id, int shoe_id, double miles);
+
+// Sets the tag (e.g. "Race Shoe") for shoe_id, provided it's owned by
+// user_id. Returns 0 on success, -1 on error.
+int db_set_shoe_tag(sqlite3 *db, int user_id, int shoe_id, const char *tag);
 
 #endif

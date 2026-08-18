@@ -4,6 +4,9 @@
 #include "raylib.h"
 #include "db.h"
 
+#define LIST_TOP 160
+#define ROW_H 46
+
 static void handle_text_input(char *buf, int *len, int max_len) {
   int key = GetCharPressed();
   while (key > 0) {
@@ -22,7 +25,7 @@ static void handle_text_input(char *buf, int *len, int max_len) {
 }
 
 int main(void) {
-  InitWindow(800, 450, "Mike's Shoe Tracker");
+  InitWindow(800, 500, "Mike's Shoe Tracker");
   SetTargetFPS(60);
 
   char username[100] = {0};
@@ -49,6 +52,14 @@ int main(void) {
   Rectangle size_box = {460, 264, 100, 32};
   Rectangle add_button = {460, 306, 150, 36};
   Rectangle logout_button = {690, 16, 90, 30};
+
+  int selected_shoe_index = -1;
+  char miles_input[20] = {0};
+  int miles_len = 0;
+  char miles_status[100] = {0};
+
+  Rectangle miles_box = {40, 400, 100, 32};
+  Rectangle add_miles_button = {150, 400, 130, 32};
 
   while (!WindowShouldClose()) {
     if (!logged_in) {
@@ -99,6 +110,10 @@ int main(void) {
         brand_len = model_len = size_len = 0;
         active_field = -1;
         add_status[0] = '\0';
+        selected_shoe_index = -1;
+        miles_input[0] = '\0';
+        miles_len = 0;
+        miles_status[0] = '\0';
         continue;
       }
 
@@ -106,7 +121,7 @@ int main(void) {
         Vector2 mouse = GetMousePosition();
 
         for (int i = 0; i < shoe_count; i++) {
-          Rectangle delete_box = {360, 160 + i * 24 - 2, 20, 20};
+          Rectangle delete_box = {360, LIST_TOP + i * ROW_H - 2, 20, 20};
           if (CheckCollisionPointRec(mouse, delete_box)) {
             sqlite3 *db = db_open("shoes.db");
             if (db) {
@@ -115,6 +130,18 @@ int main(void) {
               if (shoe_count < 0) shoe_count = 0;
               db_close(db);
             }
+            selected_shoe_index = -1;
+            break;
+          }
+        }
+
+        for (int i = 0; i < shoe_count; i++) {
+          Rectangle row_box = {40, LIST_TOP + i * ROW_H - 2, 310, ROW_H - 4};
+          if (CheckCollisionPointRec(mouse, row_box)) {
+            selected_shoe_index = i;
+            miles_input[0] = '\0';
+            miles_len = 0;
+            miles_status[0] = '\0';
             break;
           }
         }
@@ -122,6 +149,7 @@ int main(void) {
         if (CheckCollisionPointRec(mouse, brand_box)) active_field = 0;
         else if (CheckCollisionPointRec(mouse, model_box)) active_field = 1;
         else if (CheckCollisionPointRec(mouse, size_box)) active_field = 2;
+        else if (CheckCollisionPointRec(mouse, miles_box)) active_field = 3;
       }
 
       if (active_field == 0) {
@@ -130,6 +158,8 @@ int main(void) {
         handle_text_input(model_input, &model_len, sizeof(model_input));
       } else if (active_field == 2) {
         handle_text_input(size_input, &size_len, sizeof(size_input));
+      } else if (active_field == 3) {
+        handle_text_input(miles_input, &miles_len, sizeof(miles_input));
       }
 
       bool add_clicked = IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
@@ -163,6 +193,40 @@ int main(void) {
           }
         }
       }
+
+      bool add_miles_clicked = IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
+                               CheckCollisionPointRec(GetMousePosition(), add_miles_button);
+
+      if (add_miles_clicked) {
+        if (selected_shoe_index < 0 || selected_shoe_index >= shoe_count) {
+          snprintf(miles_status, sizeof(miles_status), "Click a shoe above first.");
+        } else {
+          char *endptr = NULL;
+          double miles = strtod(miles_input, &endptr);
+
+          if (endptr == miles_input || miles <= 0) {
+            snprintf(miles_status, sizeof(miles_status), "Enter a valid number of miles.");
+          } else {
+            sqlite3 *db = db_open("shoes.db");
+            if (!db) {
+              snprintf(miles_status, sizeof(miles_status), "Could not access the database.");
+            } else {
+              int shoe_id = shoes[selected_shoe_index].id;
+              if (db_add_miles(db, user_id, shoe_id, miles) < 0) {
+                snprintf(miles_status, sizeof(miles_status), "Could not add miles.");
+              } else {
+                snprintf(miles_status, sizeof(miles_status), "Added %.1f miles!", miles);
+                miles_input[0] = '\0';
+                miles_len = 0;
+
+                shoe_count = db_get_shoes(db, user_id, shoes, 50);
+                if (shoe_count < 0) shoe_count = 0;
+              }
+              db_close(db);
+            }
+          }
+        }
+      }
     }
 
     BeginDrawing();
@@ -192,12 +256,22 @@ int main(void) {
         DrawText("You don't have any shoes yet.", 40, 160, 18, DARKGRAY);
       } else {
         for (int i = 0; i < shoe_count; i++) {
-          char line[100];
+          int row_y = LIST_TOP + i * ROW_H;
+          Rectangle row_box = {40, row_y - 2, 310, ROW_H - 4};
+          if (i == selected_shoe_index) {
+            DrawRectangleRec(row_box, (Color){220, 235, 255, 255});
+          }
+
+          char line[80];
           snprintf(line, sizeof(line), "%d.) %s %s, size %.1f", i + 1,
                    shoes[i].brand, shoes[i].model, shoes[i].size);
-          DrawText(line, 40, 160 + i * 24, 18, DARKGRAY);
+          DrawText(line, 40, row_y, 18, DARKGRAY);
 
-          Rectangle delete_box = {360, 160 + i * 24 - 2, 20, 20};
+          char miles_line[40];
+          snprintf(miles_line, sizeof(miles_line), "%.1f mi", shoes[i].miles);
+          DrawText(miles_line, 60, row_y + 22, 14, GRAY);
+
+          Rectangle delete_box = {360, row_y - 2, 20, 20};
           bool delete_hovered = CheckCollisionPointRec(GetMousePosition(), delete_box);
           DrawRectangleRec(delete_box, delete_hovered ? (Color){255, 200, 200, 255}
                                                        : (Color){235, 235, 235, 255});
@@ -205,6 +279,26 @@ int main(void) {
           DrawText("x", (int)delete_box.x + 6, (int)delete_box.y + 2, 16, MAROON);
         }
       }
+
+      if (selected_shoe_index >= 0 && selected_shoe_index < shoe_count) {
+        char sel_label[100];
+        snprintf(sel_label, sizeof(sel_label), "Add miles to %s %s:",
+                 shoes[selected_shoe_index].brand, shoes[selected_shoe_index].model);
+        DrawText(sel_label, 40, 375, 16, DARKGRAY);
+      } else {
+        DrawText("Click a shoe above to add miles.", 40, 375, 16, GRAY);
+      }
+
+      DrawRectangleRec(miles_box, active_field == 3 ? LIGHTGRAY : (Color){235, 235, 235, 255});
+      DrawRectangleLinesEx(miles_box, 2, DARKGRAY);
+      DrawText(miles_input, (int)miles_box.x + 8, (int)miles_box.y + 8, 18, BLACK);
+
+      bool add_miles_hovered = CheckCollisionPointRec(GetMousePosition(), add_miles_button);
+      DrawRectangleRec(add_miles_button, add_miles_hovered ? GRAY : LIGHTGRAY);
+      DrawRectangleLinesEx(add_miles_button, 2, DARKGRAY);
+      DrawText("Add Miles", (int)add_miles_button.x + 15, (int)add_miles_button.y + 8, 16, BLACK);
+
+      DrawText(miles_status, 40, 442, 14, MAROON);
 
       DrawText("Add a shoe:", 460, 90, 18, DARKGRAY);
 

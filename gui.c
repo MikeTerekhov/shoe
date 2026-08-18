@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "raylib.h"
 #include "db.h"
@@ -24,8 +25,15 @@ static void handle_text_input(char *buf, int *len, int max_len) {
   }
 }
 
+static Color color_for_tag(const char *tag) {
+  if (strcmp(tag, "Easy Day") == 0) return (Color){70, 120, 200, 255};
+  if (strcmp(tag, "Race Shoe") == 0) return (Color){200, 60, 60, 255};
+  if (strcmp(tag, "Trail Shoe") == 0) return (Color){50, 140, 70, 255};
+  return GRAY;
+}
+
 int main(void) {
-  InitWindow(800, 500, "Mike's Shoe Tracker");
+  InitWindow(800, 560, "Mike's Shoe Tracker");
   SetTargetFPS(60);
 
   char username[100] = {0};
@@ -60,6 +68,19 @@ int main(void) {
 
   Rectangle miles_box = {40, 400, 100, 32};
   Rectangle add_miles_button = {150, 400, 130, 32};
+
+  char tag_status[100] = {0};
+  const char *tag_options[] = {"Easy Day", "Race Shoe", "Trail Shoe"};
+  Rectangle tag_buttons[3] = {
+      {40, 470, 110, 32},
+      {160, 470, 110, 32},
+      {280, 470, 110, 32},
+  };
+  Color tag_colors[3] = {
+      (Color){190, 220, 255, 255},  // Easy Day: blue
+      (Color){255, 190, 190, 255},  // Race Shoe: red
+      (Color){190, 235, 195, 255},  // Trail Shoe: green
+  };
 
   while (!WindowShouldClose()) {
     if (!logged_in) {
@@ -114,6 +135,7 @@ int main(void) {
         miles_input[0] = '\0';
         miles_len = 0;
         miles_status[0] = '\0';
+        tag_status[0] = '\0';
         continue;
       }
 
@@ -142,6 +164,7 @@ int main(void) {
             miles_input[0] = '\0';
             miles_len = 0;
             miles_status[0] = '\0';
+            tag_status[0] = '\0';
             break;
           }
         }
@@ -227,6 +250,34 @@ int main(void) {
           }
         }
       }
+
+      if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        Vector2 mouse = GetMousePosition();
+
+        for (int i = 0; i < 3; i++) {
+          if (CheckCollisionPointRec(mouse, tag_buttons[i])) {
+            if (selected_shoe_index < 0 || selected_shoe_index >= shoe_count) {
+              snprintf(tag_status, sizeof(tag_status), "Click a shoe above first.");
+            } else {
+              sqlite3 *db = db_open("shoes.db");
+              if (!db) {
+                snprintf(tag_status, sizeof(tag_status), "Could not access the database.");
+              } else {
+                int shoe_id = shoes[selected_shoe_index].id;
+                if (db_set_shoe_tag(db, user_id, shoe_id, tag_options[i]) < 0) {
+                  snprintf(tag_status, sizeof(tag_status), "Could not set tag.");
+                } else {
+                  snprintf(tag_status, sizeof(tag_status), "Tagged as %s!", tag_options[i]);
+                  shoe_count = db_get_shoes(db, user_id, shoes, 50);
+                  if (shoe_count < 0) shoe_count = 0;
+                }
+                db_close(db);
+              }
+            }
+            break;
+          }
+        }
+      }
     }
 
     BeginDrawing();
@@ -271,6 +322,11 @@ int main(void) {
           snprintf(miles_line, sizeof(miles_line), "%.1f mi", shoes[i].miles);
           DrawText(miles_line, 60, row_y + 22, 14, GRAY);
 
+          if (shoes[i].tag[0] != '\0') {
+            int offset = MeasureText(miles_line, 14) + 10;
+            DrawText(shoes[i].tag, 60 + offset, row_y + 22, 14, color_for_tag(shoes[i].tag));
+          }
+
           Rectangle delete_box = {360, row_y - 2, 20, 20};
           bool delete_hovered = CheckCollisionPointRec(GetMousePosition(), delete_box);
           DrawRectangleRec(delete_box, delete_hovered ? (Color){255, 200, 200, 255}
@@ -299,6 +355,16 @@ int main(void) {
       DrawText("Add Miles", (int)add_miles_button.x + 15, (int)add_miles_button.y + 8, 16, BLACK);
 
       DrawText(miles_status, 40, 442, 14, MAROON);
+
+      for (int i = 0; i < 3; i++) {
+        bool tag_hovered = CheckCollisionPointRec(GetMousePosition(), tag_buttons[i]);
+        Color fill = tag_hovered ? ColorBrightness(tag_colors[i], -0.2f) : tag_colors[i];
+        DrawRectangleRec(tag_buttons[i], fill);
+        DrawRectangleLinesEx(tag_buttons[i], 2, DARKGRAY);
+        DrawText(tag_options[i], (int)tag_buttons[i].x + 8, (int)tag_buttons[i].y + 8, 14, BLACK);
+      }
+
+      DrawText(tag_status, 40, 512, 14, MAROON);
 
       DrawText("Add a shoe:", 460, 90, 18, DARKGRAY);
 

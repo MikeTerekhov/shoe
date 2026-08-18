@@ -1,6 +1,7 @@
 #include "db.h"
 
 #include <stdio.h>
+#include <string.h>
 
 sqlite3 *db_open(const char *path) {
   sqlite3 *db;
@@ -21,6 +22,7 @@ sqlite3 *db_open(const char *path) {
       "brand TEXT NOT NULL, "
       "model TEXT NOT NULL, "
       "size REAL NOT NULL, "
+      "miles REAL NOT NULL DEFAULT 0, "
       "FOREIGN KEY(user_id) REFERENCES users(id)"
       ");";
 
@@ -30,6 +32,20 @@ sqlite3 *db_open(const char *path) {
     sqlite3_free(err_msg);
     sqlite3_close(db);
     return NULL;
+  }
+
+  // Migrate shoes tables created before the miles column existed. Fails
+  // harmlessly with "duplicate column" on databases that already have it.
+  int rc = sqlite3_exec(db, "ALTER TABLE shoes ADD COLUMN miles REAL NOT NULL DEFAULT 0;",
+                         NULL, NULL, &err_msg);
+  if (rc != SQLITE_OK) {
+    if (!err_msg || strstr(err_msg, "duplicate column") == NULL) {
+      fprintf(stderr, "Failed to migrate shoes table: %s\n", err_msg);
+      sqlite3_free(err_msg);
+      sqlite3_close(db);
+      return NULL;
+    }
+    sqlite3_free(err_msg);
   }
 
   return db;
@@ -139,7 +155,7 @@ int db_get_shoes(sqlite3 *db, int user_id, Shoe shoes[], int max_shoes) {
   sqlite3_stmt *stmt;
 
   if (sqlite3_prepare_v2(db,
-                          "SELECT id, brand, model, size FROM shoes "
+                          "SELECT id, brand, model, size, miles FROM shoes "
                           "WHERE user_id = ? ORDER BY id;",
                           -1, &stmt, NULL) != SQLITE_OK) {
     fprintf(stderr, "Failed to prepare select: %s\n", sqlite3_errmsg(db));
@@ -157,6 +173,7 @@ int db_get_shoes(sqlite3 *db, int user_id, Shoe shoes[], int max_shoes) {
     snprintf(shoes[count].brand, sizeof(shoes[count].brand), "%s", brand);
     snprintf(shoes[count].model, sizeof(shoes[count].model), "%s", model);
     shoes[count].size = sqlite3_column_double(stmt, 3);
+    shoes[count].miles = sqlite3_column_double(stmt, 4);
     count++;
   }
   sqlite3_finalize(stmt);
@@ -184,6 +201,30 @@ int db_delete_shoe(sqlite3 *db, int user_id, int shoe_id) {
   sqlite3_finalize(stmt);
   if (rc != SQLITE_DONE) {
     fprintf(stderr, "Failed to delete shoe: %s\n", sqlite3_errmsg(db));
+    return -1;
+  }
+
+  return 0;
+}
+
+int db_add_miles(sqlite3 *db, int user_id, int shoe_id, double miles) {
+  sqlite3_stmt *stmt;
+
+  if (sqlite3_prepare_v2(db,
+                          "UPDATE shoes SET miles = miles + ? "
+                          "WHERE id = ? AND user_id = ?;",
+                          -1, &stmt, NULL) != SQLITE_OK) {
+    fprintf(stderr, "Failed to prepare update: %s\n", sqlite3_errmsg(db));
+    return -1;
+  }
+  sqlite3_bind_double(stmt, 1, miles);
+  sqlite3_bind_int(stmt, 2, shoe_id);
+  sqlite3_bind_int(stmt, 3, user_id);
+
+  int rc = sqlite3_step(stmt);
+  sqlite3_finalize(stmt);
+  if (rc != SQLITE_DONE) {
+    fprintf(stderr, "Failed to add miles: %s\n", sqlite3_errmsg(db));
     return -1;
   }
 

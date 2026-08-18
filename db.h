@@ -23,6 +23,7 @@ int db_add_shoe(sqlite3 *db, int user_id, const char *brand,
 int db_list_shoes(sqlite3 *db, int user_id);
 
 typedef struct {
+  int id;
   char brand[50];
   char model[50];
   double size;
@@ -31,5 +32,9 @@ typedef struct {
 // Fills shoes with up to max_shoes owned by user_id. Returns the number of
 // shoes written, or -1 on error.
 int db_get_shoes(sqlite3 *db, int user_id, Shoe shoes[], int max_shoes);
+
+// Deletes the shoe with shoe_id, provided it's owned by user_id.
+// Returns 0 on success, -1 on error.
+int db_delete_shoe(sqlite3 *db, int user_id, int shoe_id);
 
 #endif

@@ -139,7 +139,7 @@ int db_get_shoes(sqlite3 *db, int user_id, Shoe shoes[], int max_shoes) {
   sqlite3_stmt *stmt;
 
   if (sqlite3_prepare_v2(db,
-                          "SELECT brand, model, size FROM shoes "
+                          "SELECT id, brand, model, size FROM shoes "
                           "WHERE user_id = ? ORDER BY id;",
                           -1, &stmt, NULL) != SQLITE_OK) {
     fprintf(stderr, "Failed to prepare select: %s\n", sqlite3_errmsg(db));
@@ -150,12 +150,13 @@ int db_get_shoes(sqlite3 *db, int user_id, Shoe shoes[], int max_shoes) {
   int count = 0;
   int rc = SQLITE_DONE;
   while (count < max_shoes && (rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-    const unsigned char *brand = sqlite3_column_text(stmt, 0);
-    const unsigned char *model = sqlite3_column_text(stmt, 1);
+    const unsigned char *brand = sqlite3_column_text(stmt, 1);
+    const unsigned char *model = sqlite3_column_text(stmt, 2);
 
+    shoes[count].id = sqlite3_column_int(stmt, 0);
     snprintf(shoes[count].brand, sizeof(shoes[count].brand), "%s", brand);
     snprintf(shoes[count].model, sizeof(shoes[count].model), "%s", model);
-    shoes[count].size = sqlite3_column_double(stmt, 2);
+    shoes[count].size = sqlite3_column_double(stmt, 3);
     count++;
   }
   sqlite3_finalize(stmt);
@@ -166,4 +167,25 @@ int db_get_shoes(sqlite3 *db, int user_id, Shoe shoes[], int max_shoes) {
   }
 
   return count;
+}
+
+int db_delete_shoe(sqlite3 *db, int user_id, int shoe_id) {
+  sqlite3_stmt *stmt;
+
+  if (sqlite3_prepare_v2(db, "DELETE FROM shoes WHERE id = ? AND user_id = ?;",
+                          -1, &stmt, NULL) != SQLITE_OK) {
+    fprintf(stderr, "Failed to prepare delete: %s\n", sqlite3_errmsg(db));
+    return -1;
+  }
+  sqlite3_bind_int(stmt, 1, shoe_id);
+  sqlite3_bind_int(stmt, 2, user_id);
+
+  int rc = sqlite3_step(stmt);
+  sqlite3_finalize(stmt);
+  if (rc != SQLITE_DONE) {
+    fprintf(stderr, "Failed to delete shoe: %s\n", sqlite3_errmsg(db));
+    return -1;
+  }
+
+  return 0;
 }

@@ -104,6 +104,21 @@ int main(void) {
 
       if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         Vector2 mouse = GetMousePosition();
+
+        for (int i = 0; i < shoe_count; i++) {
+          Rectangle delete_box = {360, 160 + i * 24 - 2, 20, 20};
+          if (CheckCollisionPointRec(mouse, delete_box)) {
+            sqlite3 *db = db_open("shoes.db");
+            if (db) {
+              db_delete_shoe(db, user_id, shoes[i].id);
+              shoe_count = db_get_shoes(db, user_id, shoes, 50);
+              if (shoe_count < 0) shoe_count = 0;
+              db_close(db);
+            }
+            break;
+          }
+        }
+
         if (CheckCollisionPointRec(mouse, brand_box)) active_field = 0;
         else if (CheckCollisionPointRec(mouse, model_box)) active_field = 1;
         else if (CheckCollisionPointRec(mouse, size_box)) active_field = 2;
@@ -181,6 +196,13 @@ int main(void) {
           snprintf(line, sizeof(line), "%d.) %s %s, size %.1f", i + 1,
                    shoes[i].brand, shoes[i].model, shoes[i].size);
           DrawText(line, 40, 160 + i * 24, 18, DARKGRAY);
+
+          Rectangle delete_box = {360, 160 + i * 24 - 2, 20, 20};
+          bool delete_hovered = CheckCollisionPointRec(GetMousePosition(), delete_box);
+          DrawRectangleRec(delete_box, delete_hovered ? (Color){255, 200, 200, 255}
+                                                       : (Color){235, 235, 235, 255});
+          DrawRectangleLinesEx(delete_box, 1, MAROON);
+          DrawText("x", (int)delete_box.x + 6, (int)delete_box.y + 2, 16, MAROON);
         }
       }
 
